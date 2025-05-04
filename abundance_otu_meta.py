@@ -85,39 +85,30 @@ if all(uploaded_files.values()):
         # Get the corresponding SimpleIDs for the selected group
         selected_simple_ids = grouped.get(selected_group, [])
         
-        if not selected_simple_ids.empty:
+        if len(selected_simple_ids) > 0:
             # Filter the merged data for the selected SimpleIDs
             group_data = merged_data.loc[selected_simple_ids]
-            print(group_data)
-            # Iterate through each group (G0, G1, G2, G3)
-            for group in ["G0", "G1", "G2", "G3"]:
-                # Get the corresponding SimpleIDs for the group
-                group_simple_ids = grouped.get(group, [])
-                
-                if len(group_simple_ids) > 0:
-                    # Filter the merged data for the group's SimpleIDs
-                    group_data = merged_data.loc[group_simple_ids]
-                    
-                    # Calculate the total abundance for each species
-                    species_abundance = group_data.sum(axis=0).sort_values(ascending=False)
-                    
-                    # Get the top 10 most abundant species
-                    top_10_species = species_abundance.head(10)
-                    
-                    # Normalize the data for the top 10 species
-                    normalized_data = group_data[top_10_species.index].div(group_data[top_10_species.index].sum(axis=1), axis=0)
-                    
-                    # Display the top 10 most abundant species in a table
-                    st.write(f"Top 10 Most Abundant Species for {group}:")
-                    st.dataframe(top_10_species)
-                    
-                    # Plot a stacked bar chart for the normalized data
-                    st.write(f"Normalized Abundance (Stacked Bar Chart) for {group}:")
-                    fig, ax = plt.subplots(figsize=(10, 6))
-                    normalized_data.plot(kind="bar", stacked=True, ax=ax, colormap="tab10")
-                    ax.set_title(f"Normalized Abundance for {group}")
-                    ax.set_ylabel("Proportion")
-                    ax.set_xlabel("Sample ID")
-                    st.pyplot(fig)
-                else:
-                    st.write(f"No data available for group {group}.")
+            
+            # Calculate the total abundance for each species
+            species_abundance = group_data.sum(axis=0).sort_values(ascending=False)
+            
+            # Get the top 10 most abundant species
+            top_10_species = species_abundance.head(10)
+            
+            # Normalize the data for the top 10 species
+            normalized_data = group_data[top_10_species.index].div(group_data[top_10_species.index].sum(axis=1), axis=0)
+            
+            # Display the top 10 most abundant species in a table
+            st.write(f"Top 10 Most Abundant Species for {selected_group}:")
+            st.dataframe(top_10_species)
+            
+            # Plot a stacked bar chart for the normalized data
+            st.write(f"Normalized Abundance (Stacked Bar Chart) for {selected_group}:")
+            fig, ax = plt.subplots(figsize=(10, 6))
+            normalized_data.plot(kind="bar", stacked=True, ax=ax, colormap="tab10")
+            ax.set_title(f"Normalized Abundance for {selected_group}")
+            ax.set_ylabel("Proportion")
+            ax.set_xlabel("Sample ID")
+            st.pyplot(fig)
+        else:
+            st.write(f"No data available for group {selected_group}.")

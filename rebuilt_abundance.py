@@ -8,7 +8,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 from tensorflow.keras import layers, models
 import streamlit as st
 
-# File upload section
+# File upload sectionz
 # Streamlit file uploader in the sidebar
 st.sidebar.title("Upload Your Files")
 uploaded_files = {
@@ -17,6 +17,13 @@ uploaded_files = {
     "Metadata File": st.sidebar.file_uploader("Upload Metadata File", type=["xlsx"]),
     "PCoA File": st.sidebar.file_uploader("Upload PCoA File", type=["xlsx"])
 }
+# Set the title of the Streamlit app
+st.title("16s Sequencing Microbial Analysis")
+
+# Add an option for "Abundance Analysis" in the Streamlit app
+st.subheader("Analysis Options")
+analysis_option = st.selectbox("Choose Analysis", ["None", "Abundance Analysis"])
+
 
 # Check if all files are uploaded
 if all(uploaded_files.values()):
@@ -56,13 +63,9 @@ if all(uploaded_files.values()):
     st.write("Grouped SimpleIDs:")
     st.write({"G0": G0, "G1": G1, "G2": G2, "G3": G3})
 
-    # Add an option for "Abundance Analysis" in the Streamlit app
-    st.sidebar.title("Analysis Options")
-    analysis_option = st.sidebar.selectbox("Choose Analysis", ["None", "Abundance Analysis"])
-
     if analysis_option == "Abundance Analysis":
         # Select CAP regression group
-        selected_group = st.sidebar.selectbox("Select CAP Regression Group", ["G0", "G1", "G2", "G3"])
+        selected_group = st.selectbox("Select CAP Regression Group", ["G0", "G1", "G2", "G3"])
         
         # Get the corresponding SimpleIDs for the selected group
         selected_simple_ids = grouped.get(selected_group, [])

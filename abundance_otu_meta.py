@@ -22,9 +22,7 @@ st.title("Microbial Analysis Dashboard")
 st.subheader("Jacqueline Ferri's DS4PH capstone project")
 st.write("May 8th, 2025")
 st.write("Here you can upload files for analysis of 16s sequencing data.")
-# Add an option for "Abundance Analysis" in the Streamlit app
-st.subheader("Analysis Options")
-analysis_option = st.selectbox("Choose Analysis", ["None", "Abundance Analysis"])
+
 
 
 # Check if all files are uploaded
@@ -41,6 +39,20 @@ if all(uploaded_files.values()):
     otu_file.index.name = "SimpleID"
     merged_data = otu_file.join(metad_file.set_index("SimpleID"), how="inner")
 
+    # print otu_file in streamlit app
+    st.write("Transposed OTU File:")
+    st.dataframe(otu_file)
+
+    # set SimpleID as the index for metadata
+    metad_file.set_index("SimpleID", inplace=True)
+    # Ensure all columns in the DataFrame are numeric before summing
+    merged_data = merged_data.apply(pd.to_numeric, errors='coerce')
+
+    # print metad_file in streamlit app
+    st.write("Metadata File:")
+    st.dataframe(metad_file)
+
+    
     # Calculate total species abundance for each sample
     # Select only numeric columns for summation
     numeric_columns = merged_data.select_dtypes(include=[np.number])
@@ -49,11 +61,22 @@ if all(uploaded_files.values()):
     # Group SimpleIDs based on "CAP regression by central review" column
     grouped = metad_file.groupby("CAP regression by central review").groups
 
+    # Display the grouped data in the Streamlit app
+    st.write("Grouped Data by 'CAP regression by central review':")
+    st.write(grouped)
+
+    # Display the 10 most abundant species
+    most_abundant_species = total_species_abundance.nlargest(10)
+
     # Extract SimpleIDs for each group
     G0 = grouped.get("G0", [])
     G1 = grouped.get("G1", [])
     G2 = grouped.get("G2", [])
     G3 = grouped.get("G3", [])
+
+    # Add an option for "Abundance Analysis" in the Streamlit app
+    st.subheader("Analysis Options")
+    analysis_option = st.selectbox("Choose Analysis", ["None", "Abundance Analysis"])
 
     if analysis_option == "Abundance Analysis":
         # Select CAP regression group
@@ -62,10 +85,10 @@ if all(uploaded_files.values()):
         # Get the corresponding SimpleIDs for the selected group
         selected_simple_ids = grouped.get(selected_group, [])
         
-        if selected_simple_ids:
+        if not selected_simple_ids.empty:
             # Filter the merged data for the selected SimpleIDs
             group_data = merged_data.loc[selected_simple_ids]
-            
+            print(group_data)
             # Iterate through each group (G0, G1, G2, G3)
             for group in ["G0", "G1", "G2", "G3"]:
                 # Get the corresponding SimpleIDs for the group

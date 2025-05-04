@@ -147,4 +147,55 @@ scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
 # Reshape the data for CNN (e.g., as a 2D "image" with 1 channel)
-X_cnn = X_scaled.reshape(X_scaled.shape[0],
+X_cnn = X_scaled.reshape(X_scaled.shape[0], X_scaled.shape[1], 1)
+
+# Define the CNN model
+cnn_model = models.Sequential([
+    layers.Conv1D(filters=32, kernel_size=3, activation='relu', input_shape=(X_cnn.shape[1], 1)),
+    layers.MaxPooling1D(pool_size=2),
+    layers.Conv1D(filters=64, kernel_size=3, activation='relu'),
+    layers.MaxPooling1D(pool_size=2),
+    layers.Flatten(),
+    layers.Dense(128, activation='relu'),
+    layers.Dense(1, activation='linear')  # For regression
+])
+
+# Compile the model
+cnn_model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mae'])
+
+# Train the model
+cnn_model.fit(X_cnn, y, epochs=50, batch_size=16, validation_split=0.2)
+
+# Reshape test data and make predictions
+X_test_cnn = scaler.transform(X_test).reshape(X_test.shape[0], X_test.shape[1], 1)
+y_pred_cnn = cnn_model.predict(X_test_cnn)
+
+# Evaluate the model
+mse_cnn = mean_squared_error(y_test, y_pred_cnn)
+r2_cnn = r2_score(y_test, y_pred_cnn)
+
+print(f"Mean Squared Error (CNN): {mse_cnn}")
+print(f"R-squared (CNN): {r2_cnn}")
+
+# Predict the groups for the testing set
+predicted_groups = model.predict(X_test)
+
+# Round the predictions to the nearest integer to match group labels
+predicted_groups = np.round(predicted_groups).astype(int)
+
+# Display the predicted groups
+print("Predicted Groups for Testing Set:")
+print(predicted_groups)
+
+# Create a DataFrame to compare actual and predicted groups
+comparison_table = pd.DataFrame({
+    'SampleID': y_test.index,
+    'Actual Group': y_test.values,
+    'Predicted Group': predicted_groups
+})
+
+# Add a column indicating whether the prediction was accurate
+comparison_table['Correct Prediction'] = comparison_table['Actual Group'] == comparison_table['Predicted Group']
+
+# Display the table
+print(comparison_table)

@@ -6,12 +6,24 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 from tensorflow.keras import layers, models
+import streamlit as st
 
 # File upload section
-otu_file = pd.read_excel('/users/jacquelineferri/16s_app/jhmi-esca-microbiota.counts.species-otu.xlsx')
-alpha_file = pd.read_excel('/users/jacquelineferri/16s_app/jhmi-esca-microbiota.alpha-diversity.xlsx')
-metad_file = pd.read_excel('/users/jacquelineferri/16s_app/meta.2022-11-07.xlsx')
-pcoa_file = pd.read_excel('/users/jacquelineferri/16s_app/bray-curtis.pcoa.1.1.xlsx')
+# Streamlit file uploader
+st.title("Upload Your Files")
+otu_file_uploaded = st.file_uploader("Upload OTU File", type=["xlsx"])
+alpha_file_uploaded = st.file_uploader("Upload Alpha Diversity File", type=["xlsx"])
+metad_file_uploaded = st.file_uploader("Upload Metadata File", type=["xlsx"])
+pcoa_file_uploaded = st.file_uploader("Upload PCoA File", type=["xlsx"])
+
+if otu_file_uploaded and alpha_file_uploaded and metad_file_uploaded and pcoa_file_uploaded:
+    # Read the uploaded files into pandas DataFrames
+    otu_file = pd.read_excel(otu_file_uploaded)
+    alpha_file = pd.read_excel(alpha_file_uploaded)
+    metad_file = pd.read_excel(metad_file_uploaded)
+    pcoa_file = pd.read_excel(pcoa_file_uploaded)
+else:
+    st.warning("Please upload all required files to proceed.")
 
 # Set '#OTU_ID' as the index for otu_file
 otu_file = otu_file.set_index('#OTU_ID')

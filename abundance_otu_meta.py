@@ -31,9 +31,7 @@ analysis_option = st.selectbox("Choose Analysis", ["None", "Abundance Analysis"]
 if all(uploaded_files.values()):
     # Read the uploaded files into pandas DataFrames
     otu_file = pd.read_excel(uploaded_files["OTU File"])
-    alpha_file = pd.read_excel(uploaded_files["Alpha Diversity File"])
     metad_file = pd.read_excel(uploaded_files["Metadata File"])
-    pcoa_file = pd.read_excel(uploaded_files["PCoA File"])
 
     # Transpose otu_file and set #OTU_ID as the index
     otu_file.set_index("#OTU_ID", inplace=True)
@@ -73,7 +71,7 @@ if all(uploaded_files.values()):
                 # Get the corresponding SimpleIDs for the group
                 group_simple_ids = grouped.get(group, [])
                 
-                if group_simple_ids:
+                if len(group_simple_ids) > 0:
                     # Filter the merged data for the group's SimpleIDs
                     group_data = merged_data.loc[group_simple_ids]
                     

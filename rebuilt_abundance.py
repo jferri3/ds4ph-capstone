@@ -35,7 +35,9 @@ if all(uploaded_files.values()):
     merged_data = otu_file.join(metad_file.set_index("SimpleID"), how="inner")
 
     # Calculate total species abundance for each sample
-    total_species_abundance = merged_data.sum(axis=1)
+    # Select only numeric columns for summation
+    numeric_columns = merged_data.select_dtypes(include=[np.number])
+    total_species_abundance = numeric_columns.sum(axis=1)
 
     # Display the result
     st.write("Total Species Abundance:")

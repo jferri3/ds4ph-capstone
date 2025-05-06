@@ -72,10 +72,23 @@ def load_data(otu_file, metad_file):
             return None, None, warnings
 
         if otu_df is not None and metad_df is not None:
-            # Check for common sample IDs, case-insensitively
-            otu_sample_ids = set(otu_df.iloc[:, 0].str.lower())
-            metadata_sample_ids = set(metad_df.iloc[:, 0].str.lower())
-            common_ids = otu_sample_ids.intersection(metadata_sample_ids)
+            # Transpose OTU data and Check for common sample IDs, case-insensitively
+            otu_df = otu_df.set_index("#OTU_ID").T.reset_index().rename(columns={"index": "id_name"})
+
+            otu_sample_ids = set(otu_df.columns.str.lower())
+            metadata_sample_ids = set(metad_df.columns.str.lower())
+
+            if "id_name" not in otu_sample_ids:
+                warnings.append("Error: '#OTU_ID' column not found in OTU file.")
+                return None, None, warnings
+            if "simpleid" not in metadata_sample_ids:
+                warnings.append("Error: 'SimpleID' column not found in metadata file.")
+                return None, None, warnings
+
+            # Ensure the correct column names are used for merging
+            metad_df = metad_df.rename(columns={"SimpleID": "id_name"})
+
+            common_ids = set(otu_df["id_name"].str.lower()).intersection(set(metad_df["id_name"].str.lower()))
             if not common_ids:
                 warnings.append("Error: No common sample IDs found between OTU and metadata files (case-insensitive check).")
                 return None, None, warnings
@@ -107,11 +120,11 @@ def cap_regression(otu_df, metad_df, group_column):
     """
     try:
         # Ensure that the first column is the sample ID for both DataFrames.
-        otu_df = otu_df.rename(columns={otu_df.iloc[:, 0].name: 'SampleID'})
-        metad_df = metad_df.rename(columns={metad_df.iloc[:, 0].name: 'SampleID'})
+        # otu_df = otu_df.rename(columns={otu_df.iloc[:, 0].name: 'id_name'}) # Already renamed in load_data
+        # metad_df = metad_df.rename(columns={metad_df.iloc[:, 0].name: 'id_name'}) # Already renamed in load_data
 
         # Merge OTU and metadata on the sample ID (first column)
-        merged_df = pd.merge(otu_df, metad_df, on='SampleID', how='inner')
+        merged_df = pd.merge(otu_df, metad_df, on='id_name', how='inner')
 
         if group_column not in merged_df.columns:
             st.error(f"Group column '{group_column}' not found in metadata.")
@@ -124,7 +137,7 @@ def cap_regression(otu_df, metad_df, group_column):
         least_abundant = {}
 
         for group_name, group_data in grouped:
-            # Exclude the SampleID and grouping column for the mean calculation
+            # Exclude the id_name and grouping column for the mean calculation
             otu_columns = group_data.select_dtypes(include=np.number).columns
             if len(otu_columns) == 0:
                 most_abundant[group_name] = "No OTUs"
@@ -163,11 +176,11 @@ def predict_groups(otu_df, metad_df, group_column, test_size=0.2, random_state=4
     """
     try:
         # Ensure that the first column is the sample ID for both DataFrames.
-        otu_df = otu_df.rename(columns={otu_df.iloc[:, 0].name: 'SampleID'})
-        metad_df = metad_df.rename(columns={metad_df.iloc[:, 0].name: 'SampleID'})
+        # otu_df = otu_df.rename(columns={otu_df.iloc[:, 0].name: 'id_name'}) # Already renamed
+        # metad_df = metad_df.rename(columns={metad_df.iloc[:, 0].name: 'id_name'}) # Already renamed
 
         # Merge OTU and metadata
-        merged_df = pd.merge(otu_df, metad_df, on='SampleID', how='inner')
+        merged_df = pd.merge(otu_df, metad_df, on='id_name', how='inner')
 
         if group_column not in merged_df.columns:
             st.error(f"Group column '{group_column}' not found in metadata.")
@@ -175,7 +188,7 @@ def predict_groups(otu_df, metad_df, group_column, test_size=0.2, random_state=4
 
         # Prepare data for classification
         X = merged_df.select_dtypes(include=np.number)  # Use only numeric columns from OTU data
-        X = X.drop(columns=[], errors='ignore') #drop SampleID and group_column if they are numeric
+        X = X.drop(columns=['id_name', group_column], errors='ignore')
         y = merged_df[group_column]
 
         # Check if there are enough samples and features

@@ -57,10 +57,50 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         combined_df = metad_df.merge(alpha_df.loc[:, ~alpha_df.columns.isin(metad_df.columns) | (alpha_df.columns == 'SimpleID')], on='SimpleID', how='inner') \
                       .merge(pcoa_df.loc[:, ~pcoa_df.columns.isin(metad_df.columns) | (pcoa_df.columns == 'SimpleID')], on='SimpleID', how='inner')
 
-        # Display merged DataFrame
-        st.subheader("Merged Data")
-        st.dataframe(combined_df.head())
+       
 
+        # Assign SimpleID's into groups based on "CAP regression by central review"
+        grouped_simple_ids = combined_df[['SimpleID', 'CAP regression by central review']].copy()
+
+        # Create a table listing SimpleIDs per group
+        group_table = grouped_simple_ids.groupby('CAP regression by central review')['SimpleID'].apply(list).reset_index()
+        group_table.columns = ['Group', 'SimpleIDs']
+
+        # Display the table in Streamlit
+        st.subheader("SimpleIDs per Group")
+        st.dataframe(group_table)
+
+        # Create a copy of otu_file named "otu_table" and transpose it
+        otu_table = otu_file.transpose()
+
+        # Calculate total species abundance
+        otu_table['Total Abundance'] = otu_table.sum(axis=1)
+        # Identify the top 10 most abundant species
+        top_10_species = otu_table['Total Abundance'].nlargest(10)
+        # Identify the 10 least abundant species
+        least_10_species = otu_table['Total Abundance'].nsmallest(10)
+        # Display the top 10 most abundant species in Streamlit
+        st.subheader("Top 10 Most Abundant Species")
+        st.dataframe(top_10_species)
+        # Display the 10 least abundant species in Streamlit
+        st.subheader("10 Least Abundant Species")
+        st.dataframe(least_10_species)
+
+        # Display the total species abundance in Streamlit
+        st.subheader("Total Species Abundance")
+        st.dataframe(otu_table[['Total Abundance']])
+
+        # Determine the most abundant species for each group
+        group_abundance = otu_file.groupby(combined_df['CAP regression by central review']).sum()
+
+        # Identify the top 10 most abundant species for each group
+        top_10_species_per_group = group_abundance.apply(lambda x: x.nlargest(10).index.tolist(), axis=1).transpose()
+
+        # Display the top 10 most abundant species for each group in Streamlit
+        st.subheader("Top 10 Most Abundant Species per Group")
+        st.dataframe(top_10_species_per_group)
+
+        
         # Select features and target
         features = ['goods_coverage', 'simpson_reciprocal', 'chao1', 'PD_whole_tree', 'observed_species', 'shannon', 'gini_index', 'fisher_alpha', 'margalef', 'brillouin_d', 'PC1', 'PC2', 'PC3', 'PC1.centroid', 'PC2.centroid']
         target_column = 'CAP regression by central review'
@@ -123,7 +163,7 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         st.subheader("Comparison of Actual and Predicted Groups")
         st.dataframe(comparison_table)
 
-        
+
 
     except Exception as e:
         st.error(f"An error occurred: {e}")

@@ -58,8 +58,6 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         combined_df = metad_df.merge(alpha_df.loc[:, ~alpha_df.columns.isin(metad_df.columns) | (alpha_df.columns == 'SimpleID')], on='SimpleID', how='inner') \
                       .merge(pcoa_df.loc[:, ~pcoa_df.columns.isin(metad_df.columns) | (pcoa_df.columns == 'SimpleID')], on='SimpleID', how='inner')
 
-       
-
         # Assign SimpleID's into groups based on "CAP regression by central review"
         grouped_simple_ids = combined_df[['SimpleID', 'CAP regression by central review']].copy()
 
@@ -105,7 +103,6 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         st.write("These are the top 10 most abundant species within each group:")
         st.dataframe(top_10_species_per_group)
 
-        
         # Select features and target
         features = ['goods_coverage', 'simpson_reciprocal', 'chao1', 'PD_whole_tree', 'observed_species', 'shannon', 'gini_index', 'fisher_alpha', 'margalef', 'brillouin_d', 'PC1', 'PC2', 'PC3', 'PC1.centroid', 'PC2.centroid']
         target_column = 'CAP regression by central review'
@@ -117,7 +114,6 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         # Encode the target variable
         label_encoder = LabelEncoder()
         combined_df[target_column] = label_encoder.fit_transform(combined_df[target_column])
-
 
         X = combined_df[features]
         y = combined_df[target_column]
@@ -159,7 +155,7 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         comparison_table = pd.DataFrame({
             'SampleID': y_test.index,
             'Actual Group': y_test.values,
-            'Predicted Group': predicted_groups
+            'Predicted Group': predicted_groups,
         })
 
         # Add a column indicating whether the prediction was accurate
@@ -189,20 +185,88 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         with col2:
             if selected_features:
                 for feature in selected_features:
-                    # Create a simple histogram for each selected feature
-                    chart = alt.Chart(combined_df).mark_bar().encode(
-                        x=alt.X(feature, bin=True),  # Use bin=True for histograms
-                        y='count()',
-                        tooltip=[feature, 'count()']
-                    ).properties(
-                        title=f"Distribution of {feature}",
-                        width=300,  # Adjust as needed
-                        height=200
-                    ).interactive()  # Make the plot interactive
+                    if feature in ['PC1', 'PC2', 'PC3', 'PC1.centroid', 'PC2.centroid']:
+                        # Create a PCA scatter plot
+                        chart = alt.Chart(combined_df).mark_circle().encode(
+                            x=alt.X('PC1'),
+                            y=alt.Y('PC2'),
+                            color='CAP regression by central review',  # Use color to distinguish groups
+                            tooltip=['SimpleID', 'PC1', 'PC2', 'CAP regression by central review']
+                        ).properties(
+                            title='PCA Plot (PC1 vs PC2)',
+                            width=400,
+                            height=300
+                        ).interactive()
+                        st.altair_chart(chart, use_container_width=True)
+                    elif feature in ['goods_coverage', 'simpson_reciprocal', 'chao1', 'PD_whole_tree', 'observed_species', 'shannon', 'gini_index', 'fisher_alpha', 'margalef', 'brillouin_d']:
+                         # Create a  scatter plot for alpha diversity indices, with SimpleID on the x-axis and the index on the y-axis
+                        chart = alt.Chart(combined_df).mark_point().encode(
+                            x=alt.X('SimpleID'),
+                            y=alt.Y(feature),
+                            tooltip=['SimpleID', feature]
+                        ).properties(
+                            title=f"{feature} vs. Sample ID",
+                            width=400,
+                            height=300
+                        ).interactive()
+                        st.altair_chart(chart, use_container_width=True)
+                    else:
+                        # Create a  histogram for other features
+                        chart = alt.Chart(combined_df).mark_bar().encode(
+                            x=alt.X(feature, bin=True),  # Use bin=True for histograms
+                            y='count()',
+                            tooltip=[feature, 'count()']
+                        ).properties(
+                            title=f"Distribution of {feature}",
+                            width=400,  # Adjust as needed
+                            height=300
+                        ).interactive()  # Make the plot interactive
 
-                    st.altair_chart(chart, use_container_width=True)
+                        st.altair_chart(chart, use_container_width=True)
             else:
                 st.write("Please select features to visualize.")
+
+        # --- Prediction Section ---
+        st.header("CAP Regression Prediction")
+        st.write("Predict CAP regression by central review using the combined data.")
+
+        # Use the combined_df for prediction
+        if combined_df is not None:  # Check if combined_df is available
+            try:
+                # Prepare data for prediction
+                X_pred = combined_df[features]  # Use the same features as the model was trained on
+
+                # Make predictions using the trained model
+                new_predictions = model.predict(X_pred)
+                new_predictions = np.round(new_predictions).astype(int)
+
+                #  Create a DataFrame to display the predictions, including SimpleID
+                prediction_df = pd.DataFrame(
+                    {'SimpleID': combined_df['SimpleID'],
+                     'Predicted Group': new_predictions,
+                     'Actual Group': combined_df['CAP regression by central review']
+                     })
+                st.subheader("Predictions")
+                st.write("Predicted CAP regression by central review:")
+                st.dataframe(prediction_df)
+
+                # Create a scatter plot to visualize prediction accuracy
+                chart = alt.Chart(prediction_df).mark_circle().encode(
+                    x=alt.X('Actual Group', title='Actual Group'),  # Map 'Actual Group' to the x-axis
+                    y=alt.Y('Predicted Group', title='Predicted Group'),  # Map 'Predicted Group' to the y-axis
+                    tooltip=['SimpleID', 'Actual Group', 'Predicted Group']  # Add tooltip for interactivity
+                ).properties(
+                    title='Actual vs. Predicted Groups',  # Set the title of the plot
+                    width=400,
+                    height=300
+                ).interactive()  # Enable zooming and panning
+
+                st.altair_chart(chart, use_container_width=True) # Display the chart
+
+            except Exception as e:
+                st.error(f"An error occurred during prediction: {e}")
+        else:
+            st.warning("Prediction requires the combined data. Please upload the necessary files to proceed.")
 
     except Exception as e:
         st.error(f"An error occurred: {e}")

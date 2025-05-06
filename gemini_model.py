@@ -58,6 +58,11 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         combined_df = metad_df.merge(alpha_df.loc[:, ~alpha_df.columns.isin(metad_df.columns) | (alpha_df.columns == 'SimpleID')], on='SimpleID', how='inner') \
                       .merge(pcoa_df.loc[:, ~pcoa_df.columns.isin(metad_df.columns) | (pcoa_df.columns == 'SimpleID')], on='SimpleID', how='inner')
 
+        # Print the first few rows of combined_df and its index
+        st.subheader("Combined DataFrame (First 5 Rows):")
+        st.dataframe(combined_df.head())
+        st.write(f"Index of combined_df: {combined_df.index}")
+
         # Assign SimpleID's into groups based on "CAP regression by central review"
         grouped_simple_ids = combined_df[['SimpleID', 'CAP regression by central review']].copy()
 
@@ -153,7 +158,7 @@ if otu_file and alpha_file and metad_file and pcoa_file:
 
         # Create a DataFrame to compare actual and predicted groups
         comparison_table = pd.DataFrame({
-            'SampleID': y_test.index,
+            'SimpleID': y_test.index, # Changed 'SampleID' to 'SimpleID'
             'Actual Group': y_test.values,
             'Predicted Group': predicted_groups,
         })
@@ -251,17 +256,25 @@ if otu_file and alpha_file and metad_file and pcoa_file:
                 st.dataframe(prediction_df)
 
                 # Create a scatter plot to visualize prediction accuracy
-                chart = alt.Chart(prediction_df).mark_circle().encode(
-                    x=alt.X('Actual Group', title='Actual Group'),  # Map 'Actual Group' to the x-axis
-                    y=alt.Y('Predicted Group', title='Predicted Group'),  # Map 'Predicted Group' to the y-axis
-                    tooltip=['SimpleID', 'Actual Group', 'Predicted Group']  # Add tooltip for interactivity
-                ).properties(
-                    title='Actual vs. Predicted Groups',  # Set the title of the plot
-                    width=400,
-                    height=300
-                ).interactive()  # Enable zooming and panning
+                st.subheader("Predicted vs. Actual Groups per Group") # change subheader name
+                for group_val in sorted(prediction_df['Actual Group'].unique()): # create a graph for each group
+                    group_df = prediction_df[prediction_df['Actual Group'] == group_val]
+                    chart = alt.Chart(group_df).mark_circle().encode(
+                        x=alt.X('SimpleID', title='Sample ID'),
+                        y=alt.Y('Predicted Group', title='Predicted Group'),
+                        color=alt.Color('Actual Group', title = "Actual Group"), # add legend title
+                        tooltip=['SimpleID', 'Actual Group', 'Predicted Group']
+                    ).properties(
+                        title=f'Group {group_val} Predictions',
+                        width=600,
+                        height=400
+                    ).interactive()
+                    st.altair_chart(chart, use_container_width=True)
 
-                st.altair_chart(chart, use_container_width=True) # Display the chart
+                # Calculate and display accuracy per group
+                st.subheader("Accuracy per Group")
+                group_accuracy = comparison_table.groupby('Actual Group')['Correct Prediction'].mean()
+                st.dataframe(group_accuracy)
 
             except Exception as e:
                 st.error(f"An error occurred during prediction: {e}")

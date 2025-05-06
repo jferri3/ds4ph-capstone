@@ -54,13 +54,13 @@ if setup_check != "None":
     # Check if all files are uploaded
     if all(uploaded_files.values()):
         try:
-           # Read the uploaded files into pandas DataFrames, handle both xlsx and csv
+            # Read the uploaded files into pandas DataFrames, handle both xlsx and csv
             otu_file_content = uploaded_files["OTU File"]
             metadata_file_content = uploaded_files["Metadata File"]
 
             otu_file = pd.read_excel(otu_file_content) if otu_file_content.name.endswith(("xlsx", "xls")) else pd.read_csv(io.BytesIO(otu_file_content.read()))
             metad_file = pd.read_excel(metadata_file_content) if metadata_file_content.name.endswith(("xlsx", "xls")) else pd.read_csv(io.BytesIO(metadata_file_content.read()))
-            
+
             # Transpose otu_file and set #OTU_ID as the index
             otu_file.set_index("#OTU_ID", inplace=True)
             otu_file = otu_file.transpose()
@@ -70,9 +70,10 @@ if setup_check != "None":
             try:
                 merged_data = otu_file.join(metad_file.set_index("SimpleID"), how="inner")
             except KeyError as e:
-                st.error(f"Error: {e}. Please ensure 'SimpleID' column exists in Metadata File and has matching values with OTU File index.")
+                st.error(
+                    f"Error: {e}. Please ensure 'SimpleID' column exists in Metadata File and has matching values with OTU File index.")
                 merged_data = None  # Set merged_data to None to prevent further errors
-                
+
             if merged_data is not None:
                 # Display outputs only if "Transpose OTU File" or "Transpose Metadata File" is selected
                 if setup_check == "Transpose OTU File":
@@ -87,12 +88,13 @@ if setup_check != "None":
                     metad_file_arrow_compatible = make_arrow_compatible(metad_file)
                     st.dataframe(metad_file_arrow_compatible)
 
-                if setup_check == "Merged File": 
-                    # Set SimpleID as both index and column in merged_data
-                    merged_data["SimpleID"] = merged_data.index
-                    merged_data.set_index("SimpleID", inplace=True)
+                if setup_check == "Merged File":
+                    # Create a copy for display, preserving the original merged_data
+                    merged_data_for_display = merged_data.copy()
+                    merged_data_for_display["SimpleID"] = merged_data_for_display.index
+                    merged_data_for_display.set_index("SimpleID", inplace=True)
                     st.write("Merged Data:")
-                    merged_data_arrow_compatible = make_arrow_compatible(merged_data)
+                    merged_data_arrow_compatible = make_arrow_compatible(merged_data_for_display)
                     st.dataframe(merged_data_arrow_compatible)
                     # Ensure all columns in the DataFrame are numeric before summing
                     merged_data = merged_data.apply(pd.to_numeric, errors='coerce')
@@ -100,7 +102,7 @@ if setup_check != "None":
                 if setup_check == "Group SimpleIDs":
                     # Group SimpleIDs based on "CAP regression by central review" column
                     if "CAP regression by central review" in merged_data.columns:
-                        grouped = metad_file.groupby("CAP regression by central review").groups
+                        grouped = merged_data.groupby("CAP regression by central review").groups
                         st.write("Grouped Data by 'CAP regression by central review':")
                         st.write(grouped)
 
@@ -110,7 +112,6 @@ if setup_check != "None":
                         # Remove 'FinalCleanSeqs' from the total species abundance if it exists
                         if 'FinalCleanSeqs' in total_species_abundance.index:
                             total_species_abundance = total_species_abundance.drop('FinalCleanSeqs')
-
 
                         # Display the 10 most abundant species
                         most_abundant_species = total_species_abundance.nlargest(10)
@@ -124,7 +125,8 @@ if setup_check != "None":
                         G2 = grouped.get("G2", [])
                         G3 = grouped.get("G3", [])
                     else:
-                        st.error("Error: 'CAP regression by central review' column not found in Metadata File.")
+                        st.error(
+                            "Error: 'CAP regression by central review' column not found in Metadata File.")
                         grouped = None  # Ensure grouped is None to prevent errors later
         except Exception as e:
             st.error(f"An error occurred: {e}")
@@ -140,7 +142,7 @@ st.subheader("Analysis Options")
 analysis_option = st.selectbox("Choose Analysis", ["None", "Abundance Analysis", "Neural Network"])
 
 if analysis_option == "Abundance Analysis":
-    if merged_data is not None and grouped is not None: # Check if merged_data and grouped are valid
+    if merged_data is not None and grouped is not None:  # Check if merged_data and grouped are valid
         # Calculate total species abundance for each sample
         numeric_columns = merged_data.select_dtypes(include=[np.number])
         total_species_abundance = numeric_columns.sum(axis=1)
@@ -151,7 +153,7 @@ if analysis_option == "Abundance Analysis":
 
         # drop zero sum rows
         total_species_abundance = total_species_abundance[total_species_abundance != 0]
-        
+
         # drop lowest 5% of species
         threshold = total_species_abundance.quantile(0.05)
         total_species_abundance = total_species_abundance[total_species_abundance > threshold]
@@ -160,10 +162,10 @@ if analysis_option == "Abundance Analysis":
         grouped = metad_file.groupby("CAP regression by central review").groups
 
         # Display the 10 most abundant species
-        #most_abundant_species = total_species_abundance.nlargest(10)
+        # most_abundant_species = total_species_abundance.nlargest(10)
 
         # Display the 10 least abundant species
-        #least_abundant_species = total_species_abundance.nsmallest(10)
+        # least_abundant_species = total_species_abundance.nsmallest(10)
 
         # Extract SimpleIDs for each group
         G0 = grouped.get("G0", [])
@@ -173,17 +175,17 @@ if analysis_option == "Abundance Analysis":
 
         # Select CAP regression group
         selected_group = st.selectbox("Select CAP Regression Group", ["G0", "G1", "G2", "G3"])
-        
+
         # Get the corresponding SimpleIDs for the selected group
         selected_simple_ids = grouped.get(selected_group, [])
-        
+
         if len(selected_simple_ids) > 0:
             # Filter the merged data for the selected SimpleIDs
             group_data = merged_data.loc[selected_simple_ids]
-            
+
             # Calculate the total abundance for each species
             species_abundance = group_data.sum(axis=0).sort_values(ascending=False)
-            
+
             # Get the top 10 most abundant species
             top_10_species = species_abundance.head(10)
 
@@ -196,13 +198,13 @@ if analysis_option == "Abundance Analysis":
             st.dataframe(top_10_species_data)
 
             # display the bottom 10 species with their counts per SimpleID
-            #least_abundant_species_data = group_data[least_abundant_species.index].transpose()
-            #st.write(f"Least Abundant Species with Counts per SimpleID for {selected_group}:")
-            #st.dataframe(least_abundant_species_data)
-            
+            # least_abundant_species_data = group_data[least_abundant_species.index].transpose()
+            # st.write(f"Least Abundant Species with Counts per SimpleID for {selected_group}:")
+            # st.dataframe(least_abundant_species_data)
+
             # Normalize the data for the top 10 species
             normalized_data = group_data[top_10_species.index].div(group_data[top_10_species.index].sum(axis=1), axis=0)
-            
+
             # Plot a stacked bar chart for the normalized data\
             st.write(f"Normalized Abundance (Stacked Bar Chart) for {selected_group}:")
             fig, ax = plt.subplots(figsize=(20, 10))
@@ -244,7 +246,6 @@ if analysis_option == "Neural Network":
         shannon_diversity = -np.sum(probabilities * np.log(probabilities), axis=1)
         return pd.Series(shannon_diversity, index=otu_file.index, name="Shannon_Diversity")
 
-
     def calculate_functional_profile(otu_data, kegg_mapping):
         """
         Calculates a simplified functional profile based on OTU abundances and a placeholder KEGG mapping.
@@ -262,7 +263,7 @@ if analysis_option == "Neural Network":
         # Placeholder KEGG mapping (replace with your actual mapping)
         # This is just an example; in reality, this would come from a database.
         kegg_mapping = {
-            otu: [f"pathway_{i+1}"]  # Assign each OTU to a unique pathway
+            otu: [f"pathway_{i + 1}"]  # Assign each OTU to a unique pathway
             for i, otu in enumerate(otu_data.columns)
         }
 
@@ -272,7 +273,8 @@ if analysis_option == "Neural Network":
             all_pathways.update(pathways)
 
         # Initialize the functional profile DataFrame.
-        functional_profile = pd.DataFrame(index=otu_data.index, columns=sorted(list(all_pathways)))  # Sort for consistency
+        functional_profile = pd.DataFrame(index=otu_data.index,
+                                          columns=sorted(list(all_pathways)))  # Sort for consistency
         functional_profile = functional_profile.fillna(0)  # Initialize all counts to zero.
 
         # Calculate pathway abundances by summing the abundances of OTUs associated with each pathway.
@@ -281,8 +283,6 @@ if analysis_option == "Neural Network":
                 for pathway in pathways:
                     functional_profile[pathway] += otu_data[species]
         return functional_profile
-
-
 
     def create_model(input_dim):
         """
@@ -295,10 +295,8 @@ if analysis_option == "Neural Network":
             tf.keras.Model: A compiled neural network model.
         """
         model = MLPRegressor(hidden_layer_sizes=(64, 32), activation='relu',
-                        solver='adam', random_state=42, max_iter=500)
+                            solver='adam', random_state=42, max_iter=500)
         return model
-
-
 
     def train_and_evaluate_model(model, X_train, y_train, X_test, y_test):
         """
@@ -322,8 +320,6 @@ if analysis_option == "Neural Network":
         r2 = r2_score(y_test, y_pred)
         return mse, r2
 
-
-
     def run_neural_network_analysis(otu_file, metad_file):
         """
         Main function to run the neural network analysis.  This is designed to be called
@@ -333,7 +329,6 @@ if analysis_option == "Neural Network":
             otu_file (pd.DataFrame): OTU abundance data.
             metad_file (pd.DataFrame): Metadata file.
         """
-
 
         # Preprocess the data (as in your original code)
         merged_data = otu_file.merge(metad_file, left_index=True, right_index=True)
@@ -348,8 +343,7 @@ if analysis_option == "Neural Network":
         # Ensure the target variable is numeric
         label_encoder = LabelEncoder()
         metad_file["CAP regression by central review"] = label_encoder.fit_transform(
-            metad_file["CAP regression by central review"].astype(str)
-        )
+            metad_file["CAP regression by central review"].astype(str))
 
         # Align samples
         common_samples = abundant_species_data.index.intersection(metad_file.index)
@@ -360,19 +354,19 @@ if analysis_option == "Neural Network":
         X_species = abundant_species_data.loc[common_samples]
         y = metad_file.loc[common_samples, "CAP regression by central review"]
 
-
         # Feature Engineering
         st.write("Performing feature engineering...")
         diversity_indices = calculate_diversity_indices(X_species)
         # Replace this with your actual KEGG mapping.
-        kegg_mapping = {otu: [f"pathway_{i+1}"] for i, otu in enumerate(X_species.columns)}
+        kegg_mapping = {otu: [f"pathway_{i + 1}"] for i, otu in enumerate(X_species.columns)}
         functional_profile = calculate_functional_profile(X_species, kegg_mapping)
 
         # Combine features
         X_combined = pd.concat([X_species, diversity_indices, functional_profile], axis=1)
 
         # Handle missing values (important before scaling)
-        X_combined = X_combined.fillna(0) # Or use a more sophisticated imputation method if appropriate for your data
+        X_combined = X_combined.fillna(
+            0)  # Or use a more sophisticated imputation method if appropriate for your data
 
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(X_combined, y, test_size=0.2, random_state=42)
@@ -391,9 +385,8 @@ if analysis_option == "Neural Network":
         st.write("Neural Network Model Performance:")
         st.write(f"Mean Squared Error: {mse}")
         st.write(f"R-squared: {r2}")
-        st.write("Note:  This model includes feature engineering (diversity indices and a placeholder functional profile).  Ensure the `calculate_functional_profile` function is replaced with your actual functional profiling implementation and that the KEGG mapping is correct and comprehensive.")
-
-
+        st.write(
+            "Note:  This model includes feature engineering (diversity indices and a placeholder functional profile).  Ensure the `calculate_functional_profile` function is replaced with your actual functional profiling implementation and that the KEGG mapping is correct and comprehensive.")
 
     if __name__ == "__main__":
         # Load your data here
@@ -409,3 +402,4 @@ if analysis_option == "Neural Network":
                     'Treatment': ['A', 'B', 'A', 'B', 'A']}
         metad_file = pd.DataFrame(meta_data, index=['Sample1', 'Sample2', 'Sample3', 'Sample4', 'Sample5'])
         run_neural_network_analysis(otu_file, metad_file)
+

@@ -47,9 +47,8 @@ st.write("Here you can upload files for analysis of 16s sequencing data.")
 
 # add option for "Set-up Check" in the Streamlit app
 st.subheader("Set-up Check")
-setup_check = st.selectbox("Choose Analysis", ["None", "Transpose OTU File", "Transpose Metadata File", "Merged File", "Group SimpleIDs"])
+setup_check = st.selectbox("Choose Analysis", ["None", "Transpose OTU File", "Metadata File", "Group SimpleIDs"])
 
-## SETUP CHECK
 # Check if "Set-up Check" is selected
 if setup_check != "None":
     # Check if all files are uploaded
@@ -65,64 +64,79 @@ if setup_check != "None":
             # Transpose otu_file and set #OTU_ID as the index
             otu_file.set_index("#OTU_ID", inplace=True)
             otu_file = otu_file.transpose()
-            otu_file.index.name = "SimpleID"  # Rename the index to SimpleID
+            otu_file.index.name = "SimpleID"
 
-            # Remove all columns from metad_file except SimpleID and "CAP regression by central review"
-            group_info = metad_file[["CAP regression by central review"]].copy()
-            group_info.index.name = "SimpleID"  # Ensure the index is named "SimpleID"
+            # Ensure the index of otu_file matches the SimpleID column in metad_file
+            #try:
+            #    merged_data = otu_file.join(metad_file.set_index("SimpleID"), how="inner")
+            #except KeyError as e:
+            #    st.error(
+            #        f"Error: {e}. Please ensure 'SimpleID' column exists in Metadata File and has matching values with OTU File index.")
+            #    merged_data = None  # Set merged_data to None to prevent further errors
+            merged_data = otu_file
 
-            # merge the OTU and metadata files
-            merged_data = otu_file.join(metad_file.set_index("SimpleID"), how="inner")
-            # Ensure all columns in the DataFrame are numeric before summing
-            merged_data = merged_data.apply(pd.to_numeric, errors='coerce')       
-         
-            # Display outputs only if "Transpose OTU File" or "Transpose Metadata File" is selected
-            if setup_check == "Transpose OTU File":
-                st.write("Transposed OTU File:")
-                otu_file_arrow_compatible = make_arrow_compatible(otu_file)
-                st.dataframe(otu_file_arrow_compatible)
+            if merged_data is not None:
+                # Display outputs only if "Transpose OTU File" or "Transpose Metadata File" is selected
+                if setup_check == "Transpose OTU File":
+                    st.write("Transposed OTU File:")
+                    otu_file_arrow_compatible = make_arrow_compatible(otu_file)
+                    st.dataframe(otu_file_arrow_compatible)
 
-            if setup_check == "Transpose Metadata File":
-                # Set SimpleID as the index for metadata
-                metad_file.set_index("SimpleID", inplace=True)
-                st.write("Metadata File:")
-                metad_file_arrow_compatible = make_arrow_compatible(metad_file)
-                st.dataframe(metad_file_arrow_compatible)
+                if setup_check == "Transpose Metadata File":
+                    # Set SimpleID as the index for metadata
+                    metad_file.set_index("SimpleID", inplace=True)
+                    st.write("Metadata File:")
+                    metad_file_arrow_compatible = make_arrow_compatible(metad_file)
+                    st.dataframe(metad_file_arrow_compatible)
 
-            if setup_check == "Group SimpleIDs":
-                # Group SimpleIDs based on "CAP regression by central review" column
-                if "CAP regression by central review" in merged_data.columns:
-                    grouped = merged_data.groupby("CAP regression by central review").groups
-                    st.write("Grouped Data by 'CAP regression by central review':")
-                    # Convert the dictionary to a DataFrame for better display in Streamlit
-                    grouped_df = pd.DataFrame.from_dict(grouped, orient='index').stack().reset_index(level=1, drop=True)
-                    grouped_df.name = "SimpleID"  # Rename the column for clarity
-                    grouped_df = grouped_df.reset_index()  # Reset the index to make it a proper DataFrame
-                    grouped_df.columns = ["CAP regression by central review", "SimpleID"]  # Rename the columns
-                    st.dataframe(grouped_df)
+                if setup_check == "Merged File":
+                    # Create a copy for display, preserving the original merged_data
+                    merged_data_for_display = merged_data.copy()
+                    merged_data_for_display["SimpleID"] = merged_data_for_display.index
+                    merged_data_for_display.set_index("SimpleID", inplace=True)
+                    st.write("Merged Data:")
+                    merged_data_arrow_compatible = make_arrow_compatible(merged_data_for_display)
+                    st.dataframe(merged_data_arrow_compatible)
+                    # Ensure all columns in the DataFrame are numeric before summing
+                    merged_data = merged_data.apply(pd.to_numeric, errors='coerce')
 
-                    # Calculate total species abundance for each sample
-                    numeric_columns = merged_data.select_dtypes(include=[np.number])
-                    total_species_abundance = numeric_columns.sum(axis=1)
-                    # Remove 'FinalCleanSeqs' from the total species abundance if it exists
-                    if 'FinalCleanSeqs' in total_species_abundance.index:
-                        total_species_abundance = total_species_abundance.drop('FinalCleanSeqs')
+                if setup_check == "Group SimpleIDs":
+                    # Group SampleIDs based on "CAP regression by central review" column
+                    if "CAP regression by central review" in metad_file.columns:
+                        # Group otu_file index by "CAP regression by central review" from metad_file
+                        grouped = metad_file.groupby("CAP regression by central review")["SimpleID"].apply(
+                            list).to_dict()
+                        st.write("Grouped Data by 'CAP regression by central review':")
+                        # Convert the dictionary to a DataFrame for better display in Streamlit
+                        grouped_df = pd.DataFrame.from_dict(grouped, orient='index').stack().reset_index(level=1,
+                                                                                                       drop=True)
+                        grouped_df.name = "SimpleID"  # Rename the column for clarity
+                        grouped_df = grouped_df.reset_index()  # Reset the index to make it a proper DataFrame
+                        grouped_df.columns = ["CAP regression by central review", "SimpleID"]  # Rename the columns
+                        st.dataframe(grouped_df)
 
-                    # Display the 10 most abundant species
-                    most_abundant_species = total_species_abundance.nlargest(10)
+                        # Calculate total species abundance for each sample
+                        numeric_columns = otu_file.select_dtypes(include=[np.number])
+                        total_species_abundance = numeric_columns.sum(axis=1)
+                        # Remove 'FinalCleanSeqs' from the total species abundance if it exists
+                        if 'FinalCleanSeqs' in total_species_abundance.index:
+                            total_species_abundance = total_species_abundance.drop('FinalCleanSeqs')
 
-                    # Display the 10 least abundant species
-                    least_abundant_species = total_species_abundance.nsmallest(10)
+                        # Display the 10 most abundant species
+                        most_abundant_species = total_species_abundance.nlargest(10)
 
-                    # Extract SimpleIDs for each group
-                    G0 = list(grouped.get("G0", []))
-                    G1 = list(grouped.get("G1", []))
-                    G2 = list(grouped.get("G2", []))
-                    G3 = list(grouped.get("G3", []))
-                else:
-                    st.error(
-                        "Error: 'CAP regression by central review' column not found in Metadata File.")
-                    grouped = None  # Ensure grouped is None to prevent errors later
+                        # Display the 10 least abundant species
+                        least_abundant_species = total_species_abundance.nsmallest(10)
+
+                        # Extract SampleIDs for each group
+                        G0 = list(grouped.get("G0", []))
+                        G1 = list(grouped.get("G1", []))
+                        G2 = list(grouped.get("G2", []))
+                        G3 = list(grouped.get("G3", []))
+                    else:
+                        st.error(
+                            "Error: 'CAP regression by central review' column not found in Metadata File.")
+                        grouped = None  # Ensure grouped is None to prevent errors later
         except Exception as e:
             st.error(f"An error occurred: {e}")
             otu_file = None
@@ -132,81 +146,53 @@ if setup_check != "None":
     else:
         st.warning("Please upload both OTU and Metadata files to use this feature.")
 
-## ABUNDANCE ANALYSIS
 # Add an option for "Abundance Analysis" in the Streamlit app
 st.subheader("Analysis Options")
 analysis_option = st.selectbox("Choose Analysis", ["None", "Abundance Analysis", "Neural Network"])
 
 if analysis_option == "Abundance Analysis":
-    if merged_data is not None:  # Use the same merged_data from the "Set-up Check" section
-        #st.write("Merged Data (Abundance Analysis):")
-        #st.dataframe(merged_data)  # Debugging: Display merged_data to verify the index
-
+    if otu_file is not None and metad_file is not None:  # Check if otu_file and metad_file are valid
         # Calculate total species abundance for each sample
-        numeric_columns = merged_data.select_dtypes(include=[np.number])
+        numeric_columns = otu_file.select_dtypes(include=[np.number])
         total_species_abundance = numeric_columns.sum(axis=1)
 
         # Remove 'FinalCleanSeqs' from the total species abundance if it exists
-        #if 'FinalCleanSeqs' in total_species_abundance.index:
-            #total_species_abundance = total_species_abundance.drop('FinalCleanSeqs')
+        if 'FinalCleanSeqs' in total_species_abundance.index:
+            total_species_abundance = total_species_abundance.drop('FinalCleanSeqs')
 
-        # Drop zero sum rows
-        #total_species_abundance = total_species_abundance[total_species_abundance != 0]
+        # drop zero sum rows
+        total_species_abundance = total_species_abundance[total_species_abundance != 0]
 
-        # Drop lowest 5% of species
-        threshold = total_species_abundance.quantile(0.01)
+        # drop lowest 5% of species
+        threshold = total_species_abundance.quantile(0.05)
         total_species_abundance = total_species_abundance[total_species_abundance > threshold]
 
-        # Group SimpleIDs based on "CAP regression by central review" column
-        grouped = merged_data.groupby("CAP regression by central review").groups
+        # Group SampleIDs based on "CAP regression by central review" column
+        grouped = metad_file.groupby("CAP regression by central review")["SimpleID"].apply(list).to_dict()
 
-        # Extract SimpleIDs for each group
+        # Extract SampleIDs for each group
         G0 = grouped.get("G0", [])
         G1 = grouped.get("G1", [])
         G2 = grouped.get("G2", [])
         G3 = grouped.get("G3", [])
+    
+        # display 10 most abundant species by group
+        st.write("10 Most Abundant Species by Group:")
+        for group, sample_ids in grouped.items():
+            st.write(f"Group {group}:")
+            group_abundance = total_species_abundance[merged_data.index.isin(sample_ids)]
+            most_abundant_species = group_abundance.nlargest(10)
+            st.write(most_abundant_species)
+        # display 10 least abundant species by group
+        st.write("10 Least Abundant Species by Group:")
+        for group, sample_ids in grouped.items():
+            st.write(f"Group {group}:")
+            group_abundance = total_species_abundance[otu_file.index.isin(sample_ids)]
+            least_abundant_species = group_abundance.nsmallest(10)
+            st.write(least_abundant_species)
 
-        # Select CAP regression group
-        selected_group = st.selectbox("Select CAP Regression Group", ["G0", "G1", "G2", "G3"])
-
-        # Get the corresponding SimpleIDs for the selected group
-        selected_simple_ids = grouped.get(selected_group, [])
-
-        # print group SimpleIDs per group
-        #st.write(f"SimpleIDs in {selected_group}: {selected_simple_ids}")
-        
-        # Display the 10 most abundant species
-        most_abundant_species = total_species_abundance.nlargest(10)
-        least_abundant_species = total_species_abundance.nsmallest(10)
-      
-
-        if len(selected_simple_ids) > 0:
-            # Filter the merged data for the selected SimpleIDs
-            group_data = merged_data.loc[selected_simple_ids]
-
-            # Select only numeric columns for summation
-            #numeric_group_data = group_data.select_dtypes(include=[np.number])
-
-            # Calculate the total abundance for each species
-            #total_species_abundance = numeric_group_data.sum(axis=0).sort_values(ascending=False)
-
-            # Get the top 10 most abundant species
-            #top_10_species = total_species_abundance.head(10)
-
-            # Display the most abundant species per group by SimpleID
-            st.write(f"Most Abundant Species per SimpleID for {selected_group}:")
-            for simple_id in selected_simple_ids:
-                if simple_id in merged_data.index:
-                    sample_data = merged_data.loc[simple_id]
-                    sample_abundance = sample_data[numeric_columns.columns].sort_values(ascending=False)
-                    st.write(f"SimpleID: {simple_id}")
-                    st.write(sample_abundance.head(10))  # Display top 10 most abundant species for this SimpleID
-
-            # Display the top 10 species with their counts per SimpleID
-            #st.write(f"Most Abundant Species with Counts per SimpleID for {selected_group}:")
-            #top_10_species_data = total_species_abundance[top_10_species.index].transpose()
-
-            #st.write(f"No data available for group {selected_group}.")
+    else:
+        st.warning("Please upload and process data in the 'Set-up Check' section first.")
 
 # Add an option for "Neural Network" in the Streamlit app
 if analysis_option == "Neural Network":
@@ -322,7 +308,7 @@ if analysis_option == "Neural Network":
 
         # Preprocess the data (as in your original code)
         merged_data = otu_file.merge(metad_file, left_index=True, right_index=True)
-        grouped = merged_data.groupby('CAP regression by central review')
+        grouped = metad_file.groupby('CAP regression by central review') #changed
 
         # Calculate abundant species (as in your original code)
         most_abundant_species = otu_file.sum(axis=0).nlargest(50)
@@ -389,6 +375,8 @@ if analysis_option == "Neural Network":
         otu_file = pd.DataFrame(data, index=['Sample1', 'Sample2', 'Sample3', 'Sample4', 'Sample5'])
 
         meta_data = {'CAP regression by central review': ['Low', 'Medium', 'High', 'Low', 'Medium'],
-                    'Treatment': ['A', 'B', 'A', 'B', 'A']}
-        metad_file = pd.DataFrame(meta_data, index=['Sample1', 'Sample2', 'Sample3', 'Sample4', 'Sample5'])
+                    'Treatment': ['A', 'B', 'A', 'B', 'A'],
+                    'SimpleID': ['Sample1', 'Sample2', 'Sample3', 'Sample4', 'Sample5']}
+        metad_file = pd.DataFrame(meta_data)
+        metad_file.set_index('SimpleID', inplace=True)
         run_neural_network_analysis(otu_file, metad_file)

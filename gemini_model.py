@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.preprocessing import LabelEncoder
+import altair as alt
 
 # File upload section
 otu_file = st.sidebar.file_uploader("Upload OTU File (Excel)", type=["xlsx"])
@@ -81,13 +82,16 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         least_10_species = otu_table['Total Abundance'].nsmallest(10)
         # Display the top 10 most abundant species in Streamlit
         st.subheader("Top 10 Most Abundant Species")
+        st.write("These are the 10 species with the highest total abundance across all samples:")
         st.dataframe(top_10_species)
         # Display the 10 least abundant species in Streamlit
         st.subheader("10 Least Abundant Species")
+        st.write("These are the 10 species with the lowest total abundance across all samples:")
         st.dataframe(least_10_species)
 
         # Display the total species abundance in Streamlit
         st.subheader("Total Species Abundance")
+        st.write("This table shows the total abundance for each species:")
         st.dataframe(otu_table[['Total Abundance']])
 
         # Determine the most abundant species for each group
@@ -98,6 +102,7 @@ if otu_file and alpha_file and metad_file and pcoa_file:
 
         # Display the top 10 most abundant species for each group in Streamlit
         st.subheader("Top 10 Most Abundant Species per Group")
+        st.write("These are the top 10 most abundant species within each group:")
         st.dataframe(top_10_species_per_group)
 
         
@@ -143,6 +148,7 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         }).sort_values(by='Importance', ascending=False)
 
         st.subheader("Feature Importance")
+        st.write("Feature importances from the Random Forest model:")
         st.dataframe(importance_df)
 
         # Display the predicted groups
@@ -161,9 +167,42 @@ if otu_file and alpha_file and metad_file and pcoa_file:
 
         # Display the table
         st.subheader("Comparison of Actual and Predicted Groups")
+        st.write("Comparison of actual and predicted groups for the testing set:")
         st.dataframe(comparison_table)
 
+        # --- Feature Plots ---
+        st.header("Feature Plots")
+        st.write("Select features to visualize:")
 
+        # Use st.columns to create a layout with two columns
+        col1, col2 = st.columns(2)
+
+        # Put the checkboxes in the first column
+        with col1:
+            # Create checkboxes for each feature
+            selected_features = []
+            for feature in features:
+                if st.checkbox(feature):
+                    selected_features.append(feature)
+
+        # In the second column, display the plots
+        with col2:
+            if selected_features:
+                for feature in selected_features:
+                    # Create a simple histogram for each selected feature
+                    chart = alt.Chart(combined_df).mark_bar().encode(
+                        x=alt.X(feature, bin=True),  # Use bin=True for histograms
+                        y='count()',
+                        tooltip=[feature, 'count()']
+                    ).properties(
+                        title=f"Distribution of {feature}",
+                        width=300,  # Adjust as needed
+                        height=200
+                    ).interactive()  # Make the plot interactive
+
+                    st.altair_chart(chart, use_container_width=True)
+            else:
+                st.write("Please select features to visualize.")
 
     except Exception as e:
         st.error(f"An error occurred: {e}")

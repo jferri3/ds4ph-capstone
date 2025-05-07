@@ -7,6 +7,13 @@ from sklearn.metrics import accuracy_score, classification_report
 from sklearn.preprocessing import LabelEncoder
 import altair as alt
 
+# Streamlit App Header
+st.subheader("Jacqueline's Capstone Project - May 08, 2025")
+st.title("16S Microbiome Data Analysis and CAP Regression Prediction")
+st.markdown("""
+This application allows you to upload microbiome data files, preprocess the data, 
+analyze species abundance, and predict CAP regression by central review using a Random Forest model.
+""")
 # File upload section
 otu_file = st.sidebar.file_uploader("Upload OTU File (Excel)", type=["xlsx"])
 alpha_file = st.sidebar.file_uploader("Upload Alpha Diversity File (Excel)", type=["xlsx"])
@@ -31,7 +38,7 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         # in otu_df, rename the first column to 'SimpleID'
         otu_df.rename(columns={otu_df.columns[0]: 'SimpleID'}, inplace=True)
 
-        # in alpha diversity file, rename the first column to 'SimpleID'
+        # in alpha diversity file, rename thefirst column to 'SimpleID'
         alpha_df.rename(columns={alpha_df.columns[0]: 'SimpleID'}, inplace=True)
 
         # in pcoa file, rename the third column to 'SimpleID'   
@@ -186,16 +193,21 @@ if otu_file and alpha_file and metad_file and pcoa_file:
                 if st.checkbox(feature):
                     selected_features.append(feature)
 
+        # Add a multiselect for the groups
+        selected_groups = st.multiselect("Select Groups to Display",
+                                         options=combined_df['CAP regression by central review'].unique(),
+                                         default=combined_df['CAP regression by central review'].unique())
+
         # In the second column, display the plots
         with col2:
             if selected_features:
                 for feature in selected_features:
                     if feature in ['PC1', 'PC2', 'PC3', 'PC1.centroid', 'PC2.centroid']:
                         # Create a PCA scatter plot
-                        chart = alt.Chart(combined_df).mark_circle().encode(
+                        chart = alt.Chart(combined_df[combined_df['CAP regression by central review'].isin(selected_groups)]).mark_circle().encode(
                             x=alt.X('PC1'),
                             y=alt.Y('PC2'),
-                            color='CAP regression by central review',  # Use color to distinguish groups
+                            color=alt.Color('CAP regression by central review', title = "Actual Group"),  # Use color to distinguish groups
                             tooltip=['SimpleID', 'PC1', 'PC2', 'CAP regression by central review']
                         ).properties(
                             title='PCA Plot (PC1 vs PC2)',
@@ -205,9 +217,10 @@ if otu_file and alpha_file and metad_file and pcoa_file:
                         st.altair_chart(chart, use_container_width=True)
                     elif feature in ['goods_coverage', 'simpson_reciprocal', 'chao1', 'PD_whole_tree', 'observed_species', 'shannon', 'gini_index', 'fisher_alpha', 'margalef', 'brillouin_d']:
                          # Create a  scatter plot for alpha diversity indices, with SimpleID on the x-axis and the index on the y-axis
-                        chart = alt.Chart(combined_df).mark_point().encode(
+                        chart = alt.Chart(combined_df[combined_df['CAP regression by central review'].isin(selected_groups)]).mark_point().encode(
                             x=alt.X('SimpleID'),
                             y=alt.Y(feature),
+                            color=alt.Color('CAP regression by central review', title = "Actual Group"),
                             tooltip=['SimpleID', feature]
                         ).properties(
                             title=f"{feature} vs. Sample ID",
@@ -217,9 +230,10 @@ if otu_file and alpha_file and metad_file and pcoa_file:
                         st.altair_chart(chart, use_container_width=True)
                     else:
                         # Create a  histogram for other features
-                        chart = alt.Chart(combined_df).mark_bar().encode(
+                        chart = alt.Chart(combined_df[combined_df['CAP regression by central review'].isin(selected_groups)]).mark_bar().encode(
                             x=alt.X(feature, bin=True),  # Use bin=True for histograms
                             y='count()',
+                            color=alt.Color('CAP regression by central review', title = "Actual Group"),
                             tooltip=[feature, 'count()']
                         ).properties(
                             title=f"Distribution of {feature}",
@@ -256,8 +270,8 @@ if otu_file and alpha_file and metad_file and pcoa_file:
                 st.dataframe(prediction_df)
 
                 # Create a scatter plot to visualize prediction accuracy
-                st.subheader("Predicted vs. Actual Groups per Group") # change subheader name
-                for group_val in sorted(prediction_df['Actual Group'].unique()): # create a graph for each group
+                st.subheader("Predicted vs. Actual Groups per Group")
+                for group_val in sorted(prediction_df['Actual Group'].unique()):
                     group_df = prediction_df[prediction_df['Actual Group'] == group_val]
                     chart = alt.Chart(group_df).mark_circle().encode(
                         x=alt.X('SimpleID', title='Sample ID'),
@@ -275,6 +289,20 @@ if otu_file and alpha_file and metad_file and pcoa_file:
                 st.subheader("Accuracy per Group")
                 group_accuracy = comparison_table.groupby('Actual Group')['Correct Prediction'].mean()
                 st.dataframe(group_accuracy)
+
+                # Create and display the detailed table per group
+                st.subheader("Detailed Predictions per Group")
+                for group_name, group_data in comparison_table.groupby('Actual Group'):
+                    st.write(f"Group: {group_name}")  # Display the group name
+                    group_data['Accuracy'] = group_data['Actual Group'] == group_data['Predicted Group']
+                    group_table = group_data[['SimpleID', 'Actual Group', 'Predicted Group', 'Accuracy']]
+                    st.dataframe(group_table)
+
+                # Display top 10 species per group
+                st.subheader("Top 10 Most Abundant Species per Group")
+                for group_name, group_species in top_10_species_per_group.items():
+                    st.write(f"Group: {group_name}")
+                    st.write(group_species)
 
             except Exception as e:
                 st.error(f"An error occurred during prediction: {e}")

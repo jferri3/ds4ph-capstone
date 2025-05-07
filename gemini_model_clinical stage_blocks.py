@@ -23,40 +23,6 @@ alpha_file = st.sidebar.file_uploader("Upload Alpha Diversity File (Excel)", typ
 metad_file = st.sidebar.file_uploader("Upload Metadata File (Excel)", type=["xlsx"])
 pcoa_file = st.sidebar.file_uploader("Upload PCoA File (Excel)", type=["xlsx"])
 
-# Add clickable sections for content
-with st.expander("Introduction"):
-    st.write("This section provides an overview of the application and its purpose.")
-
-with st.expander("File Upload Instructions"):
-    st.write("Upload the required files in Excel format. The files include OTU, Alpha Diversity, Metadata, and PCoA.")
-
-with st.expander("Uploaded Dataframes"):
-    st.write("View the first few rows of each uploaded dataframe to ensure proper formatting.")
-
-with st.expander("Data Preprocessing"):
-    st.write("Details about the preprocessing steps applied to the data.")
-
-with st.expander("SimpleIDs per Group"):
-    st.write("View the grouping of SimpleIDs based on Clinical Stage.")
-
-with st.expander("Species Abundance Analysis"):
-    st.write("Explore the total species abundance, top 10 most abundant species, and least abundant species.")
-
-with st.expander("Random Forest Model"):
-    st.write("Details about the Random Forest model training, evaluation metrics, and feature importance.")
-
-with st.expander("Neural Network Model"):
-    st.write("Details about the Neural Network model training and evaluation.")
-
-with st.expander("Feature Plots"):
-    st.write("Visualize selected features and their relationships with groups.")
-
-with st.expander("Random Forest Prediction Results"):
-    st.write("View predictions for CAP regression by central review using Random Forest and evaluate model performance.")
-
-with st.expander("Neural Network Prediction Results"):
-    st.write("View predictions for CAP regression by central review using Neural Network and evaluate model performance.")
-
 if otu_file and alpha_file and metad_file and pcoa_file:
     try:
         # Read the Excel files
@@ -122,6 +88,7 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         # Create a copy of otu_file named "otu_table" and transpose it
         otu_table = otu_file_processed.transpose()
 
+# make this it's own section
         # Calculate total species abundance
         otu_table['Total Abundance'] = otu_table.sum(axis=1)
         # Identify the top 10 most abundant species
@@ -215,6 +182,7 @@ if otu_file and alpha_file and metad_file and pcoa_file:
         st.write("Comparison of actual and predicted groups for the testing set (Random Forest):")
         st.dataframe(rf_comparison_table)
 
+# make this it's own section
         # --- Feature Plots ---
         st.header("Feature Plots")
         st.write("Select features to visualize:")
@@ -282,6 +250,7 @@ if otu_file and alpha_file and metad_file and pcoa_file:
             else:
                 st.write("Please select features to visualize.")
 
+# make this it's own section
         # --- Random Forest Prediction Section ---
         st.subheader("CAP Regression Prediction by Clinical Stage (Random Forest)")
         st.write("Predict CAP regression by central review using the combined data (Random Forest).")
@@ -296,15 +265,7 @@ if otu_file and alpha_file and metad_file and pcoa_file:
                 new_predictions_rf = rf_model.predict(X_pred_rf)
                 new_predictions_rf = np.round(new_predictions_rf).astype(int)
 
-                # Create a DataFrame to display the predictions, including SimpleID
-                prediction_df_rf = pd.DataFrame(
-                    {'SimpleID': combined_df['SimpleID'],
-                     'Predicted Group': new_predictions_rf,
-                     'Actual Group': combined_df['CAP regression by central review']
-                     })
-                st.subheader("Predictions (Random Forest)")
-                st.write("Predicted CAP regression by central review by clinical stage (Random Forest):")
-                st.dataframe(prediction_df_rf)
+              
 
                 # Calculate and display accuracy per group
                 st.subheader("Accuracy per Group (Random Forest)")
@@ -356,6 +317,7 @@ if otu_file and alpha_file and metad_file and pcoa_file:
             except Exception as e:
                 st.error(f"An error occurred during Random Forest prediction: {e}")
 
+# make this it's own section
         # --- Neural Network Model ---
         st.subheader("Neural Network Model")
         try:
@@ -448,16 +410,6 @@ if otu_file and alpha_file and metad_file and pcoa_file:
             # Make predictions
             new_predictions_nn = model.predict(X_pred_scaled_nn)
             new_predictions_nn_classes = np.argmax(new_predictions_nn, axis=1)
-
-            # Create a DataFrame to display the predictions
-            prediction_df_nn = pd.DataFrame({
-                'SimpleID': combined_df['SimpleID'],
-                'Predicted Group': new_predictions_nn_classes,
-                'Actual Group': combined_df['CAP regression by central review']
-            })
-            st.subheader("Predictions (Neural Network)")
-            st.write("Predicted CAP regression by central review by clinical stage (Neural Network):")
-            st.dataframe(prediction_df_nn)
 
             # Calculate and display accuracy per group
             st.subheader("Accuracy per Group (Neural Network)")
